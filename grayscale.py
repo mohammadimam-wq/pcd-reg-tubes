@@ -1,0 +1,144 @@
+import sys
+import cv2
+import numpy as np
+from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QMainWindow, QApplication, QFileDialog
+from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.uic import loadUi
+
+
+class ShowImage(QMainWindow):
+
+    def __init__(self):
+        super(ShowImage, self).__init__()
+        loadUi('showgui.ui', self)
+
+        self.image = None
+        self.processed_image = None
+
+        # Hubungkan tombol/menu
+        self.actionMedian.triggered.connect(self.median)
+        self.actionGrayscale.triggered.connect(self.grayscale)
+
+        self.loadButton.clicked.connect(self.loadClicked)
+
+    # ================= LOAD IMAGE =================
+    @pyqtSlot()
+    def loadClicked(self):
+
+        options = QFileDialog.Options()
+        flname, _ = QFileDialog.getOpenFileName(
+            self,
+            "Pilih Gambar",
+            "",
+            "Image Files (*.png *.jpg *.jpeg *.bmp)",
+            options=options
+        )
+
+        if flname:
+            self.loadImage(flname)
+
+    def loadImage(self, flname):
+
+        self.image = cv2.imread(flname)
+
+        if self.image is not None:
+            self.displayImage(self.image, self.imgLabel)
+
+    # ================= GRAYSCALE =================
+    def grayscale(self):
+
+        if self.image is None:
+            return
+
+        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+        self.processed_image = gray
+
+        self.displayImage(self.processed_image, self.hasilLabel)
+
+    # ================= MEDIAN FILTER =================
+    def median(self):
+
+        if self.image is None:
+            return
+
+        img_gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+        img_out = img_gray.copy()
+
+        h, w = img_gray.shape[:2]
+
+        for i in range(3, h - 3):
+            for j in range(3, w - 3):
+
+                neighbors = []
+
+                for k in range(-3, 4):
+                    for l in range(-3, 4):
+
+                        pixel = img_gray[i + k, j + l]
+                        neighbors.append(pixel)
+
+                neighbors.sort()
+
+                median_value = neighbors[24]
+
+                img_out[i, j] = median_value
+
+        self.processed_image = img_out
+
+        self.displayImage(self.processed_image, self.hasilLabel)
+
+    # ================= DISPLAY IMAGE =================
+    def displayImage(self, img_array, target_label):
+
+        if img_array is None:
+            return
+
+        if len(img_array.shape) == 3:
+
+            h, w, ch = img_array.shape
+            bytes_per_line = ch * w
+
+            img_display = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB)
+
+            q_img = QImage(
+                img_display.data,
+                w,
+                h,
+                bytes_per_line,
+                QImage.Format_RGB888
+            )
+
+        else:
+
+            h, w = img_array.shape
+            bytes_per_line = w
+
+            q_img = QImage(
+                img_array.data,
+                w,
+                h,
+                bytes_per_line,
+                QImage.Format_Grayscale8
+            )
+
+        target_label.setPixmap(QPixmap.fromImage(q_img))
+        target_label.setScaledContents(True)
+        target_label.setAlignment(QtCore.Qt.AlignCenter)
+
+
+# ================= MAIN PROGRAM =================
+if __name__ == "__main__":
+
+    app = QApplication(sys.argv)
+
+    window = ShowImage()
+
+    window.setWindowTitle('PCD - Show Image GUI')
+
+    window.show()
+
+    sys.exit(app.exec_())
